@@ -38,102 +38,40 @@ uint16_t lfsr_fib(void)
     return lfsr;
 }
 
-void _svin_background_set_15xtreme(char * filename)
+void _15xtreme_set_background(char * filename)
 {
-    //searching for fad
-    fad_t _bg_fad;
-    int iSize;
-    bool b = _svin_filelist_search(filename,&_bg_fad,&iSize);
-    assert (true == b);
-    
-    //checking if found file is the exact size we expect
-    assert(iSize == (704*448 + 2048*2));
+    _svin_background_set(filename);
+    uint8_t buf[100];
+    uint8_t * p1;
+    uint8_t * p2;
 
-    //allocate memory for 77 sectors
-    uint8_t *buffer = malloc(77 * 2048);
-    assert((int)(buffer) > 0);
-    //allocate memory for cram
-    uint8_t *palette = malloc(2048);
-    assert((int)(palette) > 0);
-
-    //set zero palette to hide loading
-    _svin_clear_palette(0);
-
-    vdp1_vram_partitions_t vdp1_vram_partitions;
-    vdp1_vram_partitions_get(&vdp1_vram_partitions);
-
-    //reading first half of the background
-    _svin_cd_block_sectors_read(_bg_fad + 1, buffer, 2048 * 77);
+        vdp1_vram_partitions_t vdp1_vram_partitions;
+        vdp1_vram_partitions_get(&vdp1_vram_partitions);
 
     //blocks
     for (int i=0;i<15;i++)
     {
-        if (i%4 < 2)
+        for (int y=0;y<48;y++)  
         {
-            for (int y=0;y<48;y++)    
-                memcpy((uint8_t *)(vdp1_vram_partitions.texture_base + 2 * 77 * 2048 + i*96*48 + y*96), &(buffer[352*16 + (i/4)*352*48 + y*352 + 160 + (i%4) * 96]), 96);
-        }
-        else
-        {
-            for (int y=0;y<48;y++)    
-                memcpy((uint8_t *)(vdp1_vram_partitions.texture_base + 2 * 77 * 2048 + i*96*48 + y*96), &(buffer[352*224 + 352*16 + (i/4)*352*48 + y*352 + (i%4-2) * 96]), 96);
+            for (int x=0;x<96;x++)    
+            {
+                p2 = (uint8_t *)(vdp1_vram_partitions.texture_base + 77 * 2048 + i*96*48 + y*96 + x);
+                if (160+i*64+x < 352)
+                        p1 = (uint8_t *)(vdp1_vram_partitions.texture_base + 160+i*64+x + y*352);
+                else
+                        p1 = (uint8_t *)(vdp1_vram_partitions.texture_base + 244 * 352 + (160+i*64+x-352) + y*352);
+                p2[0] = p1[0];
+            }
         }
     }
 
     //cut space for blocks
-    for (int x=160;x<160+96*4;x++)
+    for (int y=16;y<16+4*48;y++)  
     {
-        for (int y=16;y<16+4*48;y++)  
-        {
-            if (x<352)
-                buffer[x+y*352] = 0;
-            else
-                buffer[x+(y+223)*352] = 0;
-        }
+        memset(vdp1_vram_partitions.texture_base + y*352 + 160, 0, 352-160);
+        memset(vdp1_vram_partitions.texture_base + (y+223)*352, 0, 384+160-352);
     }
 
-    //write remaining
-    memcpy((uint8_t *)(vdp1_vram_partitions.texture_base + 0 * 2048), buffer, 2048 * 77);
-
-    //reading second half of the background
-    _svin_cd_block_sectors_read(_bg_fad + 1 + 77, buffer, 2048 * 77);
-
-    //blocks
-    for (int i=0;i<15;i++)
-    {
-        if (i%4 < 2)
-        {
-            for (int y=0;y<48;y++)    
-                memcpy((uint8_t *)(vdp1_vram_partitions.texture_base + 2 * 77 * 2048 + (i+15)*96*48 + y*96), &(buffer[352*16 + (i/4)*352*48 + y*352 + 160 + (i%4) * 96]), 96);
-        }
-        else
-        {
-            for (int y=0;y<48;y++)    
-                memcpy((uint8_t *)(vdp1_vram_partitions.texture_base + 2 * 77 * 2048 + (i+15)*96*48 + y*96), &(buffer[352*224 + 352*16 + (i/4)*352*48 + y*352 + (i%4-2) * 96]), 96);
-        }
-    }
-    
-    //cut space for blocks
-    for (int x=160;x<160+96*4;x++)
-    {
-        for (int y=16;y<16+4*48;y++)  
-        {
-            if (x<352)
-                buffer[x+y*352] = 0;
-            else
-                buffer[x+(y+223)*352] = 0;
-        }
-    }
-
-    //write remaining
-    memcpy((uint8_t *)(vdp1_vram_partitions.texture_base + 77 * 2048), buffer, 2048 * 77);
-
-    //read palette
-    _svin_cd_block_sector_read(_bg_fad + 1 + 154, palette);
-    _svin_set_palette(0, palette);
-
-    free(palette);
-    free(buffer);
 }
 
 int
@@ -379,8 +317,7 @@ main(void)
                 entry = entries[iRes][0];
         }
 
-        //_svin_background_set_15xtreme(entry.filename);
-        _svin_background_set(entry.filename);
+        _15xtreme_set_background(entry.filename);
 
         bool bComplete = false;
         bool bMoving = false;
