@@ -1,9 +1,6 @@
 #include <yaul.h>
-
-#include <assert.h>
-#include <stdlib.h>
-
 #include "svin.h"
+#include "minigame_15.h"
 
 #define MENU_ENTRY_COUNT 16
 
@@ -27,17 +24,127 @@ typedef struct {
 _entry_type *offtopic_entries;
 int iOfftopicEntriesNumber = 0;
 
+uint16_t lfsr = 0;
+
+uint16_t lfsr_fib(void)
+{
+    
+    uint16_t bit;                    /* Must be 16-bit to allow bit<<15 later in the code */
+
+    /* taps: 16 14 13 11; feedback polynomial: x^16 + x^14 + x^13 + x^11 + 1 */
+    bit = ((lfsr >> 0) ^ (lfsr >> 2) ^ (lfsr >> 3) ^ (lfsr >> 5)) & 1u;
+    lfsr = (lfsr >> 1) | (bit << 15);
+
+    return lfsr;
+}
+
+void _svin_background_set_15xtreme(char * filename)
+{
+    //searching for fad
+    fad_t _bg_fad;
+    int iSize;
+    bool b = _svin_filelist_search(filename,&_bg_fad,&iSize);
+    assert (true == b);
+    
+    //checking if found file is the exact size we expect
+    assert(iSize == (704*448 + 2048*2));
+
+    //allocate memory for 77 sectors
+    uint8_t *buffer = malloc(77 * 2048);
+    assert((int)(buffer) > 0);
+    //allocate memory for cram
+    uint8_t *palette = malloc(2048);
+    assert((int)(palette) > 0);
+
+    //set zero palette to hide loading
+    _svin_clear_palette(0);
+
+    vdp1_vram_partitions_t vdp1_vram_partitions;
+    vdp1_vram_partitions_get(&vdp1_vram_partitions);
+
+    //reading first half of the background
+    _svin_cd_block_sectors_read(_bg_fad + 1, buffer, 2048 * 77);
+
+    //blocks
+    for (int i=0;i<15;i++)
+    {
+        if (i%4 < 2)
+        {
+            for (int y=0;y<48;y++)    
+                memcpy((uint8_t *)(vdp1_vram_partitions.texture_base + 2 * 77 * 2048 + i*96*48 + y*96), &(buffer[352*16 + (i/4)*352*48 + y*352 + 160 + (i%4) * 96]), 96);
+        }
+        else
+        {
+            for (int y=0;y<48;y++)    
+                memcpy((uint8_t *)(vdp1_vram_partitions.texture_base + 2 * 77 * 2048 + i*96*48 + y*96), &(buffer[352*224 + 352*16 + (i/4)*352*48 + y*352 + (i%4-2) * 96]), 96);
+        }
+    }
+
+    //cut space for blocks
+    for (int x=160;x<160+96*4;x++)
+    {
+        for (int y=16;y<16+4*48;y++)  
+        {
+            if (x<352)
+                buffer[x+y*352] = 0;
+            else
+                buffer[x+(y+223)*352] = 0;
+        }
+    }
+
+    //write remaining
+    memcpy((uint8_t *)(vdp1_vram_partitions.texture_base + 0 * 2048), buffer, 2048 * 77);
+
+    //reading second half of the background
+    _svin_cd_block_sectors_read(_bg_fad + 1 + 77, buffer, 2048 * 77);
+
+    //blocks
+    for (int i=0;i<15;i++)
+    {
+        if (i%4 < 2)
+        {
+            for (int y=0;y<48;y++)    
+                memcpy((uint8_t *)(vdp1_vram_partitions.texture_base + 2 * 77 * 2048 + (i+15)*96*48 + y*96), &(buffer[352*16 + (i/4)*352*48 + y*352 + 160 + (i%4) * 96]), 96);
+        }
+        else
+        {
+            for (int y=0;y<48;y++)    
+                memcpy((uint8_t *)(vdp1_vram_partitions.texture_base + 2 * 77 * 2048 + (i+15)*96*48 + y*96), &(buffer[352*224 + 352*16 + (i/4)*352*48 + y*352 + (i%4-2) * 96]), 96);
+        }
+    }
+    
+    //cut space for blocks
+    for (int x=160;x<160+96*4;x++)
+    {
+        for (int y=16;y<16+4*48;y++)  
+        {
+            if (x<352)
+                buffer[x+y*352] = 0;
+            else
+                buffer[x+(y+223)*352] = 0;
+        }
+    }
+
+    //write remaining
+    memcpy((uint8_t *)(vdp1_vram_partitions.texture_base + 77 * 2048), buffer, 2048 * 77);
+
+    //read palette
+    _svin_cd_block_sector_read(_bg_fad + 1 + 154, palette);
+    _svin_set_palette(0, palette);
+
+    free(palette);
+    free(buffer);
+}
+
 int
 main(void)
 {
-        MEMORY_WRITE(32, SCU(ASR0), 0x23301FF0);
-
         offtopic_entries = (_entry_type * )LWRAM(0x80000);
 
-        
-        _svin_init();
-
+        //using 704x244 progressive mode
+        _svin_init(_SVIN_X_RESOLUTION_704,_SVIN_Y_RESOLUTION_224,true);
         _svin_textbox_disable(); //filling textbox tiles with invisible data
+        //_svin_background_set_no_filelist("BOOTLOGO.BG");
 
         bool bCD_Ok = _svin_filelist_fill(); //move this to init probably
 		if (false == bCD_Ok)
@@ -46,21 +153,132 @@ main(void)
 				_svin_textbox_print("","This game does not work in Yabause except romulo builds. Get one from https://github.com/razor85/yabause/releases/latest","Lato_Black15",7,7);
 				while (1);
 		}
+        
+        //_svin_background_fade_to_black();
+
+        //-------------- resetup VDP1 -------------------
+        _svin_cmdt_list = vdp1_cmdt_list_alloc(_MINIGAME_15_VDP1_ORDER_COUNT);
+
+        static const int16_vec2_t local_coord_ul =
+                INT16_VEC2_INITIALIZER(0,
+                                0);
+
+        static const vdp1_cmdt_draw_mode_t sprite_draw_mode = {
+                .raw = 0x0000,
+                .bits.pre_clipping_disable = true};
+
+        assert(_svin_cmdt_list != NULL);
+
+        vdp1_cmdt_t *cmdts;
+        cmdts = &_svin_cmdt_list->cmdts[0];
+
+        (void)memset(&cmdts[0], 0x00, sizeof(vdp1_cmdt_t) * _MINIGAME_15_VDP1_ORDER_COUNT);
+
+        _svin_cmdt_list->count = _MINIGAME_15_VDP1_ORDER_COUNT;
+
+        vdp1_cmdt_normal_sprite_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_0_INDEX]);
+        vdp1_cmdt_param_draw_mode_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_0_INDEX], sprite_draw_mode);
+        vdp1_cmdt_normal_sprite_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_1_INDEX]);
+        vdp1_cmdt_param_draw_mode_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_1_INDEX], sprite_draw_mode);
+        for (int i=0; i<15; i++)
+        {
+                vdp1_cmdt_normal_sprite_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_BLOCK_INDEX(i)]);
+                vdp1_cmdt_param_draw_mode_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_BLOCK_INDEX(i)], sprite_draw_mode);
+        }
+
+
+        vdp1_cmdt_system_clip_coord_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SYSTEM_CLIP_COORDS_INDEX]);
+
+        vdp1_cmdt_local_coord_set(&cmdts[_MINIGAME_15_VDP1_ORDER_LOCAL_COORDS_INDEX]);
+        vdp1_cmdt_param_vertex_set(&cmdts[_MINIGAME_15_VDP1_ORDER_LOCAL_COORDS_INDEX],
+                                CMDT_VTX_LOCAL_COORD, &local_coord_ul);
+
+        vdp1_cmdt_end_set(&cmdts[_MINIGAME_15_VDP1_ORDER_DRAW_END_INDEX]);
+        #define VDP1_FBCR_DIE (0x0008)
+        if (_svin_videomode_y_res > 256)
+                MEMORY_WRITE(16, VDP1(FBCR), VDP1_FBCR_DIE);
+        
+        vdp1_vram_partitions_set(64,//VDP1_VRAM_DEFAULT_CMDT_COUNT,
+                                0x7F000, //  VDP1_VRAM_DEFAULT_TEXTURE_SIZE,
+                                0,//  VDP1_VRAM_DEFAULT_GOURAUD_COUNT,
+                                0);//  VDP1_VRAM_DEFAULT_CLUT_COUNT);
+
+        static vdp1_env_t vdp1_env = {
+                .erase_color = COLOR_RGB1555(1, 0, 0, 0),
+                .erase_points[0] = {
+                        .x = 0,
+                        .y = 0
+                },
+                .bpp = VDP1_ENV_BPP_8,
+                .rotation = VDP1_ENV_ROTATION_0,
+                .color_mode = VDP1_ENV_COLOR_MODE_PALETTE,
+                .sprite_type = 0xC
+        };
+
+        vdp1_env.erase_points[1].x = _svin_videomode_x_res-1;
+        vdp1_env.erase_points[1].y = _svin_videomode_y_res-1;
+
+        vdp1_env_set(&vdp1_env);
+
+        vdp1_vram_partitions_t vdp1_vram_partitions;
+        vdp1_vram_partitions_get(&vdp1_vram_partitions);
+
+        vdp1_cmdt_color_bank_t dummy_bank;
+        dummy_bank.raw = 0;
+
+        vdp1_cmdt_t *cmdt_sprite;
+        cmdt_sprite = &cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_0_INDEX];
+        cmdt_sprite->cmd_xa = 0;
+        cmdt_sprite->cmd_ya = 0;
+        cmdt_sprite->cmd_size = 0x2CE0;
+        cmdt_sprite->cmd_srca = ((int)vdp1_vram_partitions.texture_base-VDP1_VRAM(0) ) / 8;
+        vdp1_cmdt_param_color_mode4_set(cmdt_sprite, dummy_bank);
+        vdp1_cmdt_param_color_bank_set(cmdt_sprite, dummy_bank);
+        cmdt_sprite->cmd_pmod |= 0x08C0; //enabling ECD and SPD manually for now
+        cmdt_sprite = &cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_1_INDEX];
+        cmdt_sprite->cmd_xa = 352;
+        cmdt_sprite->cmd_ya = 0;
+        cmdt_sprite->cmd_size = 0x2CE0;
+        cmdt_sprite->cmd_srca = ((int)vdp1_vram_partitions.texture_base - VDP1_VRAM(0) + _svin_videomode_x_res*_svin_videomode_y_res/2 ) / 8;
+        vdp1_cmdt_param_color_mode4_set(cmdt_sprite, dummy_bank);
+        vdp1_cmdt_param_color_bank_set(cmdt_sprite, dummy_bank);
+        cmdt_sprite->cmd_pmod |= 0x08C0; //enabling ECD and SPD manually for now
+
+        for (int i=0;i<15;i++)
+        {
+                cmdt_sprite = &cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_BLOCK_INDEX(i)];
+                cmdt_sprite->cmd_xa = 164+96*(i%4);
+                cmdt_sprite->cmd_ya = 16+48*(i/4);
+                cmdt_sprite->cmd_size = 0x0C30;
+                cmdt_sprite->cmd_srca = ((int)vdp1_vram_partitions.texture_base - VDP1_VRAM(0) + _svin_videomode_x_res*_svin_videomode_y_res + i*96*48 ) / 8;
+                vdp1_cmdt_param_color_mode4_set(cmdt_sprite, dummy_bank);
+                vdp1_cmdt_param_color_bank_set(cmdt_sprite, dummy_bank);        
+                //vdp1_cmdt_jump_assign(cmdt_sprite, _SVIN_VDP1_ORDER_DRAW_END_B_INDEX * 4);//skipping B2 and B3
+                cmdt_sprite->cmd_pmod |= 0x08C0; //enabling ECD and SPD manually for now
+        }
+
+
+        vdp1_cmdt_t *cmdt_system_clip_coords;
+        cmdt_system_clip_coords = &cmdts[_MINIGAME_15_VDP1_ORDER_SYSTEM_CLIP_COORDS_INDEX];
+
+        cmdt_system_clip_coords->cmd_xc = _svin_videomode_x_res - 1;
+        cmdt_system_clip_coords->cmd_yc = _svin_videomode_y_res - 1;
+
+        
+        vdp1_sync_cmdt_list_put(_svin_cmdt_list, 0);
+        vdp1_sync();
+        //-------------- resetup VDP1 done -------------------
+
+        _svin_set_vdp1_cmdlist_toggle_at_vblank(false); //no need in progressive mode
+
 		
-		_svin_background_set("BOOTLOGO.BG");
-		
-		//move blocks away
+	//move blocks away
         uint16_t * p16 = (uint16_t*)VDP1_VRAM(0);
         for (int i=0;i<15;i++)
         {
-                p16[_SVIN_VDP1_ORDER_SPRITE_BLOCK_A_INDEX(i)*16+6] = -100;
-                p16[_SVIN_VDP1_ORDER_SPRITE_BLOCK_A_INDEX(i)*16+7] = -100;
-                p16[_SVIN_VDP1_ORDER_SPRITE_BLOCK_B_INDEX(i)*16+6] = -100;
-                p16[_SVIN_VDP1_ORDER_SPRITE_BLOCK_B_INDEX(i)*16+7] = -100;
+                p16[_MINIGAME_15_VDP1_ORDER_SPRITE_BLOCK_INDEX(i)*16+6] = -100;
+                p16[_MINIGAME_15_VDP1_ORDER_SPRITE_BLOCK_INDEX(i)*16+7] = -100;
         }
-
-        //_svin_background_set_15xtreme("PICTURE.BG");
-
 
         _svin_menu_init("SCRIPT_ENG.MNU"); //this requires filelist to be loaded first
 
@@ -161,8 +379,8 @@ main(void)
                 entry = entries[iRes][0];
         }
 
-
-        _svin_background_set_15xtreme(entry.filename);//"offtopic/210613.bg");
+        //_svin_background_set_15xtreme(entry.filename);
+        _svin_background_set(entry.filename);
 
         bool bComplete = false;
         bool bMoving = false;
@@ -303,7 +521,7 @@ main(void)
                 else
                 {
                         //check keys
-                        iKeyCode =  _svin_check_key_press();
+                        iKeyCode =  _svin_get_keys_state();
                         if (false == bKeyPressed)
                         {
                                 switch (iKeyCode)
@@ -369,10 +587,8 @@ main(void)
                                 x = x + iShiftX;
                                 y = y + iShiftY;
                         }
-                        p16[_SVIN_VDP1_ORDER_SPRITE_BLOCK_A_INDEX(i)*16+6] = x;
-                        p16[_SVIN_VDP1_ORDER_SPRITE_BLOCK_A_INDEX(i)*16+7] = y;
-                        p16[_SVIN_VDP1_ORDER_SPRITE_BLOCK_B_INDEX(i)*16+6] = x;
-                        p16[_SVIN_VDP1_ORDER_SPRITE_BLOCK_B_INDEX(i)*16+7] = y;
+                        p16[_MINIGAME_15_VDP1_ORDER_SPRITE_BLOCK_INDEX(i)*16+6] = x;
+                        p16[_MINIGAME_15_VDP1_ORDER_SPRITE_BLOCK_INDEX(i)*16+7] = y;
                 }
 				int col = lfsr_fib();
 				col = col%16;
@@ -380,7 +596,7 @@ main(void)
                         bs_color = COLOR_RGB1555(1, col, col, col);
                 else
                         bs_color = COLOR_RGB1555(1, 0, 0, 0);
-                vdp2_scrn_back_screen_color_set(VDP2_VRAM_ADDR(3, 0x01FFFE), bs_color);
+                vdp2_scrn_back_color_set(VDP2_VRAM_ADDR(3, 0x01FFFE), bs_color);
 
                 iDivider++;
                 if (iDivider%5 == 0)
@@ -400,15 +616,13 @@ main(void)
 
         _svin_background_set(entry.filename);//"offtopic/210613.bg");
         bs_color = COLOR_RGB1555(1, 0, 0, 0);
-        vdp2_scrn_back_screen_color_set(VDP2_VRAM_ADDR(3, 0x01FFFE), bs_color);
+        vdp2_scrn_back_color_set(VDP2_VRAM_ADDR(3, 0x01FFFE), bs_color);
         //move blocks away
         uint16_t * p16 = (uint16_t*)VDP1_VRAM(0);
         for (int i=0;i<15;i++)
         {
-                p16[_SVIN_VDP1_ORDER_SPRITE_BLOCK_A_INDEX(i)*16+6] = -100;
-                p16[_SVIN_VDP1_ORDER_SPRITE_BLOCK_A_INDEX(i)*16+7] = -100;
-                p16[_SVIN_VDP1_ORDER_SPRITE_BLOCK_B_INDEX(i)*16+6] = -100;
-                p16[_SVIN_VDP1_ORDER_SPRITE_BLOCK_B_INDEX(i)*16+7] = -100;
+                p16[_MINIGAME_15_VDP1_ORDER_SPRITE_BLOCK_INDEX(i)*16+6] = -100;
+                p16[_MINIGAME_15_VDP1_ORDER_SPRITE_BLOCK_INDEX(i)*16+7] = -100;
         }
 
         _svin_wait_for_key_press_and_release();
