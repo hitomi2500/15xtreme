@@ -103,7 +103,7 @@ main(void)
 
         static const vdp1_cmdt_draw_mode_t sprite_draw_mode = {
                 .raw = 0x0000,
-                .bits.pre_clipping_disable = true};
+                .pre_clipping_disable = true};
 
         assert(_svin_cmdt_list != NULL);
 
