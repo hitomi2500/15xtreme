@@ -115,13 +115,13 @@ main(void)
         _svin_cmdt_list->count = _MINIGAME_15_VDP1_ORDER_COUNT;
 
         vdp1_cmdt_normal_sprite_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_0_INDEX]);
-        vdp1_cmdt_param_draw_mode_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_0_INDEX], sprite_draw_mode);
+        vdp1_cmdt_draw_mode_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_0_INDEX], sprite_draw_mode);
         vdp1_cmdt_normal_sprite_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_1_INDEX]);
-        vdp1_cmdt_param_draw_mode_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_1_INDEX], sprite_draw_mode);
+        vdp1_cmdt_draw_mode_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_1_INDEX], sprite_draw_mode);
         for (int i=0; i<15; i++)
         {
                 vdp1_cmdt_normal_sprite_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_BLOCK_INDEX(i)]);
-                vdp1_cmdt_param_draw_mode_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_BLOCK_INDEX(i)], sprite_draw_mode);
+                vdp1_cmdt_draw_mode_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_BLOCK_INDEX(i)], sprite_draw_mode);
         }
 
 
@@ -169,16 +169,16 @@ main(void)
         cmdt_sprite->cmd_ya = 0;
         cmdt_sprite->cmd_size = 0x2CE0;
         cmdt_sprite->cmd_srca = ((int)vdp1_vram_partitions.texture_base-VDP1_VRAM(0) ) / 8;
-        vdp1_cmdt_param_color_mode4_set(cmdt_sprite, dummy_bank);
-        vdp1_cmdt_param_color_bank_set(cmdt_sprite, dummy_bank);
+        vdp1_cmdt_color_mode4_set(cmdt_sprite, dummy_bank);
+        vdp1_cmdt_color_bank_set(cmdt_sprite, dummy_bank);
         cmdt_sprite->cmd_pmod |= 0x08C0; //enabling ECD and SPD manually for now
         cmdt_sprite = &cmdts[_MINIGAME_15_VDP1_ORDER_SPRITE_1_INDEX];
         cmdt_sprite->cmd_xa = 352;
         cmdt_sprite->cmd_ya = 0;
         cmdt_sprite->cmd_size = 0x2CE0;
         cmdt_sprite->cmd_srca = ((int)vdp1_vram_partitions.texture_base - VDP1_VRAM(0) + _svin_videomode_x_res*_svin_videomode_y_res/2 ) / 8;
-        vdp1_cmdt_param_color_mode4_set(cmdt_sprite, dummy_bank);
-        vdp1_cmdt_param_color_bank_set(cmdt_sprite, dummy_bank);
+        vdp1_cmdt_color_mode4_set(cmdt_sprite, dummy_bank);
+        vdp1_cmdt_color_bank_set(cmdt_sprite, dummy_bank);
         cmdt_sprite->cmd_pmod |= 0x08C0; //enabling ECD and SPD manually for now
 
         for (int i=0;i<15;i++)
@@ -188,8 +188,8 @@ main(void)
                 cmdt_sprite->cmd_ya = 16+48*(i/4);
                 cmdt_sprite->cmd_size = 0x0C30;
                 cmdt_sprite->cmd_srca = ((int)vdp1_vram_partitions.texture_base - VDP1_VRAM(0) + _svin_videomode_x_res*_svin_videomode_y_res + i*96*48 ) / 8;
-                vdp1_cmdt_param_color_mode4_set(cmdt_sprite, dummy_bank);
-                vdp1_cmdt_param_color_bank_set(cmdt_sprite, dummy_bank);        
+                vdp1_cmdt_color_mode4_set(cmdt_sprite, dummy_bank);
+                vdp1_cmdt_color_bank_set(cmdt_sprite, dummy_bank);        
                 //vdp1_cmdt_jump_assign(cmdt_sprite, _SVIN_VDP1_ORDER_DRAW_END_B_INDEX * 4);//skipping B2 and B3
                 cmdt_sprite->cmd_pmod |= 0x08C0; //enabling ECD and SPD manually for now
         }
