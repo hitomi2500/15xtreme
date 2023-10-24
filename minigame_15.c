@@ -128,7 +128,7 @@ main(void)
         vdp1_cmdt_system_clip_coord_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SYSTEM_CLIP_COORDS_INDEX]);
 
         vdp1_cmdt_local_coord_set(&cmdts[_MINIGAME_15_VDP1_ORDER_LOCAL_COORDS_INDEX]);
-        vdp1_cmdt_vtx_local_coord_set(&cmdts[_MINIGAME_15_VDP1_ORDER_LOCAL_COORDS_INDEX], &local_coord_ul);
+        vdp1_cmdt_vtx_local_coord_set(&cmdts[_MINIGAME_15_VDP1_ORDER_LOCAL_COORDS_INDEX], local_coord_ul);
 
         vdp1_cmdt_end_set(&cmdts[_MINIGAME_15_VDP1_ORDER_DRAW_END_INDEX]);
         #define VDP1_FBCR_DIE (0x0008)
