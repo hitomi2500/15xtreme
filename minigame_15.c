@@ -128,8 +128,7 @@ main(void)
         vdp1_cmdt_system_clip_coord_set(&cmdts[_MINIGAME_15_VDP1_ORDER_SYSTEM_CLIP_COORDS_INDEX]);
 
         vdp1_cmdt_local_coord_set(&cmdts[_MINIGAME_15_VDP1_ORDER_LOCAL_COORDS_INDEX]);
-        vdp1_cmdt_param_vertex_set(&cmdts[_MINIGAME_15_VDP1_ORDER_LOCAL_COORDS_INDEX],
-                                CMDT_VTX_LOCAL_COORD, &local_coord_ul);
+        vdp1_cmdt_vtx_local_coord_set(&cmdts[_MINIGAME_15_VDP1_ORDER_LOCAL_COORDS_INDEX], &local_coord_ul);
 
         vdp1_cmdt_end_set(&cmdts[_MINIGAME_15_VDP1_ORDER_DRAW_END_INDEX]);
         #define VDP1_FBCR_DIE (0x0008)
@@ -142,7 +141,7 @@ main(void)
                                 0);//  VDP1_VRAM_DEFAULT_CLUT_COUNT);
 
         static vdp1_env_t vdp1_env = {
-                .erase_color = COLOR_RGB1555(1, 0, 0, 0),
+                .erase_color = RGB1555(1, 0, 0, 0),
                 .erase_points[0] = {
                         .x = 0,
                         .y = 0
@@ -402,7 +401,7 @@ main(void)
         int iDivider = 0;
         int iShiftX = 0;
         int iShiftY = 0;
-        color_rgb1555_t bs_color;
+        rgb1555_t bs_color;
         bool bKeyPressed = false;
         //char buf[256];
         //acivate main loop
@@ -530,9 +529,9 @@ main(void)
 				int col = lfsr_fib();
 				col = col%16;
                 if ((iSelectedX == iHoleX) && (iSelectedY == iHoleY))
-                        bs_color = COLOR_RGB1555(1, col, col, col);
+                        bs_color = RGB1555(1, col, col, col);
                 else
-                        bs_color = COLOR_RGB1555(1, 0, 0, 0);
+                        bs_color = RGB1555(1, 0, 0, 0);
                 vdp2_scrn_back_color_set(VDP2_VRAM_ADDR(3, 0x01FFFE), bs_color);
 
                 iDivider++;
@@ -552,7 +551,7 @@ main(void)
         }
 
         _svin_background_set(entry.filename);//"offtopic/210613.bg");
-        bs_color = COLOR_RGB1555(1, 0, 0, 0);
+        bs_color = RGB1555(1, 0, 0, 0);
         vdp2_scrn_back_color_set(VDP2_VRAM_ADDR(3, 0x01FFFE), bs_color);
         //move blocks away
         uint16_t * p16 = (uint16_t*)VDP1_VRAM(0);
